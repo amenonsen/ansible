@@ -98,19 +98,20 @@ class VaultCLI(CLI):
         old_umask = os.umask(0o077)
 
         if self.options.vault_password_file:
-            # read vault_pass from a file
             self.vault_pass = CLI.read_vault_password_file(self.options.vault_password_file, loader)
+        elif self.action in ['create', 'encrypt']:
+            self.vault_pass = self.ask_vault_password(prompt="New Vault password: ", confirm=True)
         else:
-            newpass = False
-            rekey = False
-            if not self.options.new_vault_password_file:
-                newpass = (self.action in ['create', 'rekey', 'encrypt'])
-                rekey = (self.action == 'rekey')
-            self.vault_pass, self.new_vault_pass = self.ask_vault_passwords(ask_new_vault_pass=newpass, rekey=rekey)
+            self.vault_pass = self.ask_vault_password()
 
-        if self.options.new_vault_password_file:
-            # for rekey only
-            self.new_vault_pass = CLI.read_vault_password_file(self.options.new_vault_password_file, loader)
+        if self.action == 'rekey':
+            if self.options.new_vault_password_file:
+                self.new_vault_pass = CLI.read_vault_password_file(self.options.new_vault_password_file, loader)
+            else:
+                self.new_vault_pass = self.ask_vault_password(prompt="New Vault password: ", confirm=True)
+
+            if not self.new_vault_pass:
+                raise AnsibleOptionsError("A new password is required to rekey")
 
         if not self.vault_pass:
             raise AnsibleOptionsError("A password is required to use Ansible's Vault")

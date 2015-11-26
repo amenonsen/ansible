@@ -110,33 +110,27 @@ class CLI(object):
                 display.display(u"No config file found; using defaults")
 
     @staticmethod
-    def ask_vault_passwords(ask_new_vault_pass=False, rekey=False):
-        ''' prompt for vault password and/or password change '''
+    def ask_vault_password(prompt="Vault password: ", confirm=False):
+        '''
+        prompt for the vault password, confirm the input if requested, and
+        return the stripped input as a byte string
+        '''
 
         vault_pass = None
-        new_vault_pass = None
         try:
-            if rekey or not ask_new_vault_pass:
-                vault_pass = getpass.getpass(prompt="Vault password: ")
+            vault_pass = getpass.getpass(prompt=prompt)
 
-            if ask_new_vault_pass:
-                new_vault_pass = getpass.getpass(prompt="New Vault password: ")
-                new_vault_pass2 = getpass.getpass(prompt="Confirm New Vault password: ")
-                if new_vault_pass != new_vault_pass2:
+            if confirm:
+                vault_pass2 = getpass.getpass(prompt="Confirm " + prompt)
+                if vault_pass != vault_pass2:
                     raise AnsibleError("Passwords do not match")
         except EOFError:
             pass
 
-        # enforce no newline chars at the end of passwords
         if vault_pass:
             vault_pass = to_bytes(vault_pass, errors='strict', nonstring='simplerepr').strip()
-        if new_vault_pass:
-            new_vault_pass = to_bytes(new_vault_pass, errors='strict', nonstring='simplerepr').strip()
 
-        if ask_new_vault_pass and not rekey:
-            vault_pass = new_vault_pass
-
-        return vault_pass, new_vault_pass
+        return vault_pass
 
     def ask_passwords(self):
         ''' prompt for connection and become passwords if needed '''
