@@ -113,10 +113,11 @@ class VaultCLI(CLI):
             if not self.new_vault_pass:
                 raise AnsibleOptionsError("A new password is required to rekey")
 
+        options = None
         if not self.vault_pass:
             raise AnsibleOptionsError("A password is required to use Ansible's Vault")
 
-        self.editor = VaultEditor(self.vault_pass)
+        self.editor = VaultEditor(self.vault_pass, cipher=self.options.vault_cipher, options=options)
 
         self.execute()
 

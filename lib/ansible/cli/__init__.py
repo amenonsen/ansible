@@ -238,6 +238,8 @@ class CLI(object):
                 help="specify number of parallel processes to use (default=%s)" % C.DEFAULT_FORKS)
 
         if vault_opts:
+            parser.add_option('--cipher', default=C.VAULT_CIPHER, dest='vault_cipher',
+                help='specify vault cipher', type=str)
             parser.add_option('--ask-vault-pass', default=C.DEFAULT_ASK_VAULT_PASS, dest='ask_vault_pass', action='store_true',
                 help='ask for vault password')
             parser.add_option('--vault-password-file', default=C.DEFAULT_VAULT_PASSWORD_FILE, dest='vault_password_file',

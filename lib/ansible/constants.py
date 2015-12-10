@@ -168,6 +168,9 @@ DEFAULT_NO_TARGET_SYSLOG   = get_config(p, DEFAULTS, 'no_target_syslog', 'ANSIBL
 # selinux
 DEFAULT_SELINUX_SPECIAL_FS = get_config(p, 'selinux', 'special_context_filesystems', None, 'fuse, nfs, vboxsf, ramfs', islist=True)
 
+# Vault settings
+VAULT_CIPHER              = get_config(p, 'vault', 'cipher', 'ANSIBLE_VAULT_CIPHER', 'AES256')
+
 ### PRIVILEGE ESCALATION ###
 # Backwards Compat
 DEFAULT_SU                = get_config(p, DEFAULTS, 'su', 'ANSIBLE_SU', False, boolean=True)
@@ -287,8 +290,6 @@ DEFAULT_SUDO_PASS         = None
 DEFAULT_REMOTE_PASS       = None
 DEFAULT_SUBSET            = None
 DEFAULT_SU_PASS           = None
-VAULT_VERSION_MIN         = 1.0
-VAULT_VERSION_MAX         = 1.0
 MAX_FILE_SIZE_FOR_DIFF    = 1*1024*1024
 TREE_DIR                  = None
 LOCALHOST                 = frozenset(['127.0.0.1', 'localhost', '::1'])
