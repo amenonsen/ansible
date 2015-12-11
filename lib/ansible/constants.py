@@ -170,6 +170,14 @@ DEFAULT_SELINUX_SPECIAL_FS = get_config(p, 'selinux', 'special_context_filesyste
 
 # Vault settings
 VAULT_CIPHER              = get_config(p, 'vault', 'cipher', 'ANSIBLE_VAULT_CIPHER', 'AES256')
+VAULT_GPG_BINARY          = get_config(p, 'vault', 'gpg_binary', 'ANSIBLE_GPG_BINARY', 'gpg2')
+VAULT_GPG_DEBUG           = get_config(p, 'vault', 'gpg_debug', 'ANSIBLE_GPG_DEBUG', 'none')
+VAULT_GPG_PROMPT          = get_config(p, 'vault', 'gpg_prompt', 'ANSIBLE_GPG_PROMPT', False, boolean=True)
+VAULT_GPG_HOMEDIR         = get_config(p, 'vault', 'gpg_homedir', 'ANSIBLE_GPG_HOMEDIR', None)
+VAULT_GPG_KEYRING         = get_config(p, 'vault', 'gpg_keyring', 'ANSIBLE_GPG_KEYRING', None)
+VAULT_GPG_SECRING         = get_config(p, 'vault', 'gpg_secring', 'ANSIBLE_GPG_SECRING', None)
+VAULT_GPG_OPTIONS         = get_config(p, 'vault', 'gpg_options', 'ANSIBLE_GPG_OPTIONS', None)
+VAULT_GPG_RECIPIENTS      = get_config(p, 'vault', 'gpg_recipients', 'ANSIBLE_GPG_RECIPIENTS', '')
 
 ### PRIVILEGE ESCALATION ###
 # Backwards Compat

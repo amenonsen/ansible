@@ -240,6 +240,22 @@ class CLI(object):
         if vault_opts:
             parser.add_option('--cipher', default=C.VAULT_CIPHER, dest='vault_cipher',
                 help='specify vault cipher', type=str)
+            parser.add_option('--gpg-binary', default=C.VAULT_GPG_BINARY, dest='vault_gpg_binary',
+                help='path to gpg binary', action='callback', callback=CLI.expand_tilde, type=str)
+            parser.add_option('--gpg-debug', default=C.VAULT_GPG_DEBUG, dest='vault_gpg_debug',
+                help='gpg debug level', type=str)
+            parser.add_option('--gpg-prompt', default=C.VAULT_GPG_PROMPT, dest='vault_gpg_prompt',
+                help='prompt for GPG password or not', action='store_true')
+            parser.add_option('--gpg-homedir', default=C.VAULT_GPG_HOMEDIR, dest='vault_gpg_homedir',
+                help='path to gpg home directory', action='callback', callback=CLI.expand_tilde, type=str)
+            parser.add_option('--gpg-keyring', default=C.VAULT_GPG_KEYRING, dest='vault_gpg_keyring',
+                help='path to gpg public key ring', action='callback', callback=CLI.expand_tilde, type=str)
+            parser.add_option('--gpg-secring', default=C.VAULT_GPG_SECRING, dest='vault_gpg_secring',
+                help='path to gpg private key ring', action='callback', callback=CLI.expand_tilde, type=str)
+            parser.add_option('--gpg-options', default=C.VAULT_GPG_OPTIONS, dest='vault_gpg_options',
+                help='additional gpg command-line options', type=str)
+            parser.add_option('--gpg-recipients', default=C.VAULT_GPG_RECIPIENTS, dest='vault_gpg_recipients',
+                help='gpg recipients separated by commas', type=str)
             parser.add_option('--ask-vault-pass', default=C.DEFAULT_ASK_VAULT_PASS, dest='ask_vault_pass', action='store_true',
                 help='ask for vault password')
             parser.add_option('--vault-password-file', default=C.DEFAULT_VAULT_PASSWORD_FILE, dest='vault_password_file',

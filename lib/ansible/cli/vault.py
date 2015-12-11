@@ -97,24 +97,38 @@ class VaultCLI(CLI):
         # set default restrictive umask
         old_umask = os.umask(0o077)
 
+        # If we're using GPG, then we (a) never need to prompt for a password
+        # for encryption, and (b) prompt for a decryption password only when
+        # --gpg-prompt is specified.
+
+        gpg = self.options.vault_cipher == 'GPG'
+        gpg_prompt = self.options.vault_gpg_prompt
+
         if self.options.vault_password_file:
             self.vault_pass = CLI.read_vault_password_file(self.options.vault_password_file, loader)
         elif self.action in ['create', 'encrypt']:
-            self.vault_pass = self.ask_vault_password(prompt="New Vault password: ", confirm=True)
+            if not gpg:
+                self.vault_pass = self.ask_vault_password(prompt="New Vault password: ", confirm=True)
         else:
-            self.vault_pass = self.ask_vault_password()
+            if gpg_prompt or not gpg:
+                self.vault_pass = self.ask_vault_password()
 
         if self.action == 'rekey':
             if self.options.new_vault_password_file:
                 self.new_vault_pass = CLI.read_vault_password_file(self.options.new_vault_password_file, loader)
             else:
-                self.new_vault_pass = self.ask_vault_password(prompt="New Vault password: ", confirm=True)
+                if not gpg:
+                    self.new_vault_pass = self.ask_vault_password(prompt="New Vault password: ", confirm=True)
 
-            if not self.new_vault_pass:
+            if not self.new_vault_pass and not gpg:
                 raise AnsibleOptionsError("A new password is required to rekey")
 
         options = None
-        if not self.vault_pass:
+        if gpg:
+            options = dict()
+            for opt in ['binary', 'debug', 'homedir', 'keyring', 'secring', 'options', 'recipients']:
+                options['gpg_'+opt] = getattr(self.options, 'vault_gpg_'+opt)
+        elif not self.vault_pass:
             raise AnsibleOptionsError("A password is required to use Ansible's Vault")
 
         self.editor = VaultEditor(self.vault_pass, cipher=self.options.vault_cipher, options=options)

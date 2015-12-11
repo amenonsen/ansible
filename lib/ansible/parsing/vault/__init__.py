@@ -25,6 +25,7 @@ import sys
 import tempfile
 import random
 import base64
+import re
 from io import BytesIO
 from subprocess import call
 from ansible.errors import AnsibleError
@@ -79,11 +80,23 @@ except ImportError:
 
 HAS_ANY_PBKDF2HMAC = HAS_PBKDF2 or HAS_PBKDF2HMAC
 
+# GPG imports; we require 2.0.2 from pip
+try:
+    import gnupg
+    authors = gnupg.__authors__
+    version = gnupg.__version__
+    if authors:
+        if version > 2:
+            HAS_GNUPG2 = True
+except ImportError, AttributeError:
+    HAS_GNUPG2 = False
+
 CRYPTO_UPGRADE = "ansible-vault requires a newer version of pycrypto than the one installed on your platform. You may fix this with OS-specific commands such as: yum install python-devel; rpm -e --nodeps python-crypto; pip install pycrypto"
+GNUPG_UPGRADE = "ansible-vault requires python-gnupg 2.0.2 or later; See http://pythonhosted.org/gnupg/ You may fix this by installing from pip directly: pip install gnupg"
 
 b_HEADER = b'$ANSIBLE_VAULT'
-CIPHER_WHITELIST = frozenset((b'AES', b'AES256'))
-CIPHER_WRITE_WHITELIST=frozenset((b'AES256',))
+CIPHER_WHITELIST = frozenset((b'AES', b'AES256', b'GPG'))
+CIPHER_WRITE_WHITELIST=frozenset((b'AES256', b'GPG'))
 DEFAULT_WRITE_CIPHER=b'AES256'
 # See also CIPHER_MAPPING at the bottom of the file which maps cipher strings
 # (used in VaultFile header) to a cipher class
@@ -91,7 +104,9 @@ DEFAULT_WRITE_CIPHER=b'AES256'
 class VaultLib:
 
     def __init__(self, password, cipher_options=None):
-        self.b_password = to_bytes(password, errors='strict', encoding='utf-8')
+        self.b_password = None
+        if password:
+            self.b_password = to_bytes(password, errors='strict', encoding='utf-8')
         self.cipher_options = cipher_options
 
     def is_encrypted(self, data):
@@ -102,7 +117,10 @@ class VaultLib:
         :returns: True if it is recognized.  Otherwise, False.
         """
 
-        if to_bytes(data, errors='strict', encoding='utf-8').startswith(b_HEADER):
+        msg = to_bytes(data, errors='strict', encoding='utf-8')
+        if msg.startswith(b_HEADER):
+            return True
+        elif msg.startswith("-----BEGIN PGP MESSAGE-----\n"):
             return True
         return False
 
@@ -155,9 +173,12 @@ class VaultLib:
         b_vault_version = None
         b_cipher_name = None
         b_cipher_version = None
-        b_data = None
 
-        if len(header) >= 3 and header[0] == b_HEADER:
+        if len(header) == 1 and header[0] == '-----BEGIN PGP MESSAGE-----':
+            b_cipher_name = b'GPG'
+            b_vault_version = b'1.2'
+            b_cipher_version = b'1.0'
+        elif len(header) >= 3 and header[0] == b_HEADER:
             b_vault_version = header[1].strip()
             b_cipher_name = header[2].strip()
             if b_vault_version.split(b'.') >= [b'1', b'2']:
@@ -168,11 +189,10 @@ class VaultLib:
                 b_cipher_version = b_vault_version
             else:
                 raise AnsibleError("Malformed vault header.  Expected 3 fields for vault 1.1 and below")
+            if len(lines) > 1:
+                b_data = lines[1]
         else:
             raise AnsibleError("Input is not an encrypted vault file")
-
-        if len(lines) > 1:
-            b_data = lines[1]
 
         return (b_vault_version, b_cipher_name, b_cipher_version, b_data)
 
@@ -211,9 +231,6 @@ class VaultLib:
         :returns: A tuple of vault version as byte str, cipher name as byte
             str, cipher version as byte str, and plaintext as a byte str
         """
-        if self.b_password is None:
-            raise AnsibleError("A vault password must be specified to decrypt data")
-
         b_vault_version, b_cipher_name, b_cipher_version, b_ciphertext = self._parse_vault_header(data)
 
         if not b_cipher_name in CIPHER_WHITELIST:
@@ -523,6 +540,9 @@ class VaultAES:
 
         # http://stackoverflow.com/a/14989032
 
+        if password is None:
+            raise AnsibleError("A vault password must be specified to decrypt data")
+
         data = unhexlify(data.replace(b'\n',''))
 
         in_file = BytesIO(data)
@@ -670,6 +690,10 @@ class VaultAES256:
         return data
 
     def decrypt(self, message, password, version=None):
+
+        if password is None:
+            raise AnsibleError("A vault password must be specified to decrypt data")
+
         message = message.replace(b'\n', '')
 
         if version == b'1.1':
@@ -728,7 +752,59 @@ class VaultAES256:
                 result |= ord(x) ^ ord(y)
         return result == 0
 
+class VaultGPG:
+
+    """
+    Vault implementation using gpg (via python-gnupg wrapper).
+    """
+
+    def __init__(self, options):
+        if not HAS_GNUPG2:
+            raise AnsibleError(GNUPG_UPGRADE)
+
+        self.version = b'1.0'
+
+        gpg_binary = options['gpg_binary']
+        gpg_options = shlex.split(options['gpg_options'] or '')
+        self.recipients = options['gpg_recipients']
+
+        try:
+            self.gpg = gnupg.GPG(
+                binary=gpg_binary,
+                homedir=options['gpg_homedir'],
+                keyring=options['gpg_keyring'],
+                secring=options['gpg_secring'],
+                verbose=options['gpg_debug'],
+                options=gpg_options,
+            )
+        except RuntimeError:
+            raise AnsibleError("Couldn't run GPG; please check your gpg binary: %s" % gpg_binary)
+
+    def encrypt(self, plaintext, password):
+
+        recipients = to_bytes(self.recipients, errors='strict', encoding='utf-8')
+        if not recipients:
+            raise AnsibleError("No recipients specified");
+
+        rcpt = re.split('\s*,?\s*', recipients)
+        enc = self.gpg.encrypt(plaintext, *rcpt)
+        if not enc.ok:
+            raise AnsibleError("Encryption failed:\n%s" % enc.stderr)
+
+        ciphertext = str(enc)
+        return ciphertext
+
+    def decrypt(self, message, password, version=None):
+
+        dec = self.gpg.decrypt(message, passphrase=password)
+        if not dec.ok:
+            raise AnsibleError("Decryption failed:\n%s" % dec.stderr)
+
+        plaintext = str(dec)
+        return plaintext
+
 CIPHER_MAPPING = {
         b'AES': VaultAES,
         b'AES256': VaultAES256,
+        b'GPG': VaultGPG,
     }
